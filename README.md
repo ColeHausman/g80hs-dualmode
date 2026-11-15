@@ -8,7 +8,7 @@ One file, Python 3.8+ standard library only.
 | Platform | Status |
 |---|---|
 | Windows 10/11 | Tested (RTX 4090, HDMI, firmware 1000.2) |
-| macOS, Apple Silicon | **Untested.** Written from the same protocol; needs USB-C/DisplayPort |
+| macOS, Apple Silicon | Tested (macOS 26.7.2, M5 Pro, DisplayPort): reads, writes, `dual` and `6k` work. See [macOS notes](#macos-notes) |
 | macOS, Intel | Not supported |
 | Linux | Not included; the commands below work with `ddcutil` |
 
@@ -121,10 +121,24 @@ Rules the script follows, and that you should keep if you port it:
 
 ## macOS notes
 
-The macOS code has not been run on a real machine yet. It uses the private `IOAVService`
-I2C calls (the same approach as m1ddc and MonitorControl) and CoreGraphics for the 60 Hz
-step. Start with `python3 g80hs.py status` and `get F0`, which only read. If those work,
-please report whether `toggle` does.
+Tested on macOS 26.7.2, Apple M5 Pro, monitor connected over DisplayPort (input `dp`).
+`status`, `get`, `snapshot`, `set` (brightness round trip), `dual` and `6k` all worked.
+`toggle` was not run separately; it uses the same two paths.
+
+It uses the private `IOAVService` I2C calls (the same approach as m1ddc and MonitorControl)
+and CoreGraphics for the 60 Hz step. The Mac needs a USB-C/DisplayPort connection, and the
+monitor must be on the Mac's input for the Mac to see it.
+
+- **EDID IDs differ over DisplayPort.** macOS sees the 6K display as model `0x7C5C` and Dual
+  Mode as `0x7C5A` (Windows over HDMI: `0x7C5F` / `0x7C5E`). The script accepts all of them.
+- **If the monitor is the Mac's only display, macOS signs you out on every switch.** The
+  monitor disconnects and reconnects as a different display, which tears down the session.
+  The switch itself completes. With a second display attached this should not happen, but
+  that was not tested. Run `dual` and `6k` from a context that survives it (for example
+  `nohup python3 g80hs.py 6k &`), because the script's own "finished?" checks can be cut off
+  by the sign-out.
+- In Dual Mode macOS offers 60, 120, 240 and 330 Hz, up to 3072x1728.
+- The 60 Hz step before `6k` worked: the monitor reached 6K with F0 = 0 on the first write.
 
 ## License
 

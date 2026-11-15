@@ -191,6 +191,9 @@ elif sys.platform == "darwin":
     _cg.CGDisplayModeGetRefreshRate.restype = c_double
     _cg.CGDisplayModeGetRefreshRate.argtypes = [c_void_p]
 
+    MODEL_DUAL_DP = 0x7C5A              # Dual Mode EDID over DisplayPort on macOS (HDMI/Windows: 0x7C5E)
+    MODEL_6K_DP = 0x7C5C                # 6K EDID as seen over DisplayPort on macOS (HDMI/Windows: 0x7C5F)
+
     def _mode_tuple(m):
         return (_cg.CGDisplayModeGetWidth(m), _cg.CGDisplayModeGetHeight(m),
                 _cg.CGDisplayModeGetPixelWidth(m), _cg.CGDisplayModeGetPixelHeight(m),
@@ -203,8 +206,9 @@ elif sys.platform == "darwin":
             _cg.CGGetOnlineDisplayList(16, ids, byref(n))
             self.display = None
             for d in ids[:n.value]:
-                if _cg.CGDisplayVendorNumber(d) == VENDOR and _cg.CGDisplayModelNumber(d) in (MODEL_6K, MODEL_DUAL):
+                if _cg.CGDisplayVendorNumber(d) == VENDOR and _cg.CGDisplayModelNumber(d) in (MODEL_6K, MODEL_DUAL, MODEL_6K_DP, MODEL_DUAL_DP):
                     self.display, self.model = d, _cg.CGDisplayModelNumber(d)
+                    self.model = {MODEL_6K_DP: MODEL_6K, MODEL_DUAL_DP: MODEL_DUAL}.get(self.model, self.model)
             if self.display is None:
                 raise NotFound("G80HS not found (is it connected to this Mac and showing its picture?)")
             # 2. Matching IOAVService: read the first EDID bytes over I2C (address 0x50).
@@ -221,7 +225,7 @@ elif sys.platform == "darwin":
                     continue
                 buf = (ctypes.c_ubyte * 16)()
                 if _iokit.IOAVServiceReadI2C(av, 0x50, 0x00, buf, 16) == 0 and bytes(buf[8:10]) == b"\x4c\x2d" \
-                        and bytes(buf[10:12]) in (b"\x5e\x7c", b"\x5f\x7c"):
+                        and bytes(buf[10:12]) in (b"\x5e\x7c", b"\x5f\x7c", b"\x5c\x7c", b"\x5a\x7c"):
                     candidates.append(av)
                 else:
                     _cf.CFRelease(av)
